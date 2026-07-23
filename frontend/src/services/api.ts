@@ -46,6 +46,11 @@ export const api = {
     });
   },
 
+  getProfile: async (): Promise<User> => {
+    const data = await fetchWithAuth('/auth/profile');
+    return data.user;
+  },
+
   getUsers: async (): Promise<User[]> => {
     const data = await fetchWithAuth('/users');
     return data.users || [];

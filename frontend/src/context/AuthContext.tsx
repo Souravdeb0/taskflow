@@ -28,15 +28,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('taskflow_user');
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (err) {
-        localStorage.removeItem('taskflow_user');
+    const initializeAuth = async () => {
+      const storedUser = localStorage.getItem('taskflow_user');
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+          const freshUser = await api.getProfile();
+          setUser(freshUser);
+          localStorage.setItem('taskflow_user', JSON.stringify(freshUser));
+        } catch (err) {
+          console.warn('Session sync failed, using cached session:', err);
+          const errorMsg = String(err).toLowerCase();
+          if (errorMsg.includes('unauthorized') || errorMsg.includes('401')) {
+            setUser(null);
+            localStorage.removeItem('taskflow_user');
+            localStorage.removeItem('taskflow_firebase_token');
+          }
+        }
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    initializeAuth();
   }, []);
 
   const isFirebaseKeyInvalidError = (err: any): boolean => {
