@@ -16,7 +16,7 @@
     "firebase-admin": "^12.1.0",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.13",
-    "surrealdb": "^1.1.0",
+    "surrealdb": "^2.0.6",
     "zod": "^3.23.8"
   },
   "devDependencies": {

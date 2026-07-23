@@ -3,47 +3,40 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const host = process.env.SMTP_HOST;
-const port = parseInt(process.env.SMTP_PORT || '587');
-const user = process.env.SMTP_USER;
-const pass = process.env.SMTP_PASS;
+const smtpHost = process.env.SMTP_HOST;
+const smtpPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined;
+const smtpUser = process.env.SMTP_USER;
+const smtpPass = process.env.SMTP_PASS;
 
 let transporter: nodemailer.Transporter | null = null;
 
-if (host && user && pass) {
+if (smtpHost && smtpPort && smtpUser && smtpPass) {
   transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465, // true for 465, false for other ports
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
     auth: {
-      user,
-      pass,
+      user: smtpUser,
+      pass: smtpPass,
     },
   });
-  console.log(`Nodemailer SMTP Transporter initialized (Host: ${host}:${port})`);
+  console.log('Nodemailer SMTP Transporter initialized');
 } else {
-  console.warn('SMTP configuration missing. Email service will run in MOCK mode (logging to console).');
+  console.warn(
+    'SMTP configuration missing. Email service will run in MOCK mode (logging to console).'
+  );
 }
 
-export interface EmailOptions {
-  to: string;
-  subject: string;
-  text: string;
-  html?: string;
-}
-
-export async function sendEmail({ to, subject, text, html }: EmailOptions) {
+export async function sendEmail({ to, subject, text }: { to: string; subject: string; text: string }) {
   try {
     if (transporter) {
-      const info = await transporter.sendMail({
-        from: `"Jira Lite Reminders" <${user}>`,
+      await transporter.sendMail({
+        from: `"Jira Lite Reminders" <${smtpUser}>`,
         to,
         subject,
         text,
-        html: html || text.replace(/\n/g, '<br>'),
       });
-      console.log(`Email successfully sent to ${to}. MessageId: ${info.messageId}`);
-      return info;
+      console.log(`Email successfully sent to ${to}`);
     } else {
       console.log(`
 =========================================
@@ -51,15 +44,12 @@ export async function sendEmail({ to, subject, text, html }: EmailOptions) {
 To: ${to}
 Subject: ${subject}
 Date: ${new Date().toISOString()}
-
 Body:
 ${text}
 =========================================
       `);
-      return { mock: true, to, subject };
     }
   } catch (error) {
     console.error(`Failed to send email to ${to}:`, error);
-    throw error;
   }
 }

@@ -42,7 +42,7 @@ TICKET_RESPONSE=$(curl -s -X POST "$API_URL/tickets" \
 echo "$TICKET_RESPONSE"
 
 # Extract Ticket ID using python
-TICKET_ID=$(echo "$TICKET_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['ticket']['id'])")
+TICKET_ID=$(echo "$TICKET_RESPONSE" | python3 -c "import sys, json; data=json.load(sys.stdin); tid=data['ticket']['id']; print(tid if isinstance(tid, str) else f\"{tid['tb']}:{tid['id']}\")")
 echo "Extracted Ticket ID: $TICKET_ID"
 echo ""
 
@@ -65,7 +65,6 @@ curl -s -X POST "$API_URL/tickets/$TICKET_ID/assign" \
   -H "Content-Type: application/json" \
   -H "x-mock-user-uid: alice_uid" \
   -d "{\"userId\": \"user:bob_uid\"}"
-echo "$TICKET_RESPONSE"
 echo ""
 
 # 8. Bob adds a comment
@@ -92,10 +91,10 @@ echo ""
 echo "11. Simulating ticket inactivity (dating updated_at to 10 days ago)..."
 curl -s -X POST "http://localhost:8000/sql" \
   -u "root:root" \
-  -H "NS: jira_lite" \
-  -H "DB: jira_lite" \
+  -H "NS: taskflow" \
+  -H "DB: taskflow" \
   -H "Accept: application/json" \
-  -d "UPDATE $TICKET_ID SET updated_at = time::now() - 10d;"
+  -d "UPDATE type::record('$TICKET_ID') SET updated_at = time::now() - 10d;"
 echo ""
 
 # 12. Trigger email reminders

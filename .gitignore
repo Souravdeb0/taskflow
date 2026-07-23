@@ -34,3 +34,7 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Firebase Secrets
+serviceAccountKey.json
+backend/serviceAccountKey.json

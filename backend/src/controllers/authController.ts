@@ -1,18 +1,10 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 
-export async function login(req: AuthenticatedRequest, res: Response) {
-  try {
-    res.json({ message: 'Login successful', user: req.user });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to process login' });
-  }
+export async function loginHandler(req: AuthenticatedRequest, res: Response) {
+  res.json({ message: 'Login successful', user: req.user });
 }
 
-export async function getProfile(req: AuthenticatedRequest, res: Response) {
-  try {
-    res.json({ user: req.user });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch profile' });
-  }
+export async function profileHandler(req: AuthenticatedRequest, res: Response) {
+  res.json({ user: req.user });
 }
