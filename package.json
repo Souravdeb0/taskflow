@@ -1,6 +1,7 @@
 {
   "name": "taskflow-monorepo",
   "private": true,
+  "type": "module",
   "workspaces": [
     "frontend",
     "backend"
