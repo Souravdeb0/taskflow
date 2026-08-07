@@ -23,7 +23,9 @@ export async function connectDB() {
     console.log(`Connected to SurrealDB at ${url} (NS: ${ns}, DB: ${dbName})`);
   } catch (error) {
     console.error('Failed to connect to SurrealDB:', error);
-    process.exit(1);
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    }
   }
 }
 
