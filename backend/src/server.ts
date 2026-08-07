@@ -50,7 +50,16 @@ async function startServer() {
   });
 }
 
-startServer().catch((error) => {
-  console.error('Fatal error starting server:', error);
-  process.exit(1);
-});
+if (!process.env.VERCEL) {
+  startServer().catch((error) => {
+    console.error('Fatal error starting server:', error);
+    process.exit(1);
+  });
+} else {
+  // In serverless, initialize database connection.
+  connectDB().catch((error) => {
+    console.error('Database connection failed in serverless startup:', error);
+  });
+}
+
+export default app;

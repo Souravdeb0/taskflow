@@ -11,11 +11,15 @@ const pass = process.env.SURREAL_PASS || 'root';
 
 export const db = new Surreal();
 
+let isConnected = false;
+
 export async function connectDB() {
+  if (isConnected) return;
   try {
     await db.connect(url);
     await db.signin({ username: user, password: pass });
     await db.use({ namespace: ns, database: dbName });
+    isConnected = true;
     console.log(`Connected to SurrealDB at ${url} (NS: ${ns}, DB: ${dbName})`);
   } catch (error) {
     console.error('Failed to connect to SurrealDB:', error);
@@ -23,30 +27,63 @@ export async function connectDB() {
   }
 }
 
-export async function safeQuery(queryStr: string, bindings?: any): Promise<any> {
+async function executeWithAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
   try {
-    return await db.query(queryStr, bindings);
+    return await fn();
   } catch (err: any) {
-    if (err.kind === 'NotFound' || err.message?.includes('does not exist') || err.message?.includes('NotFound')) {
-      return [[]];
+    const isAuthError =
+      err.kind === 'NotAllowed' ||
+      err.kind === 'Permission' ||
+      err.message?.includes('Anonymous access') ||
+      err.message?.includes('NotAllowed') ||
+      err.message?.includes('permission');
+
+    if (isAuthError) {
+      console.warn('SurrealDB session unauthenticated. Re-authenticating...');
+      await db.signin({ username: user, password: pass });
+      await db.use({ namespace: ns, database: dbName });
+      return await fn();
     }
     throw err;
   }
+}
+
+export async function safeQuery(queryStr: string, bindings?: any): Promise<any> {
+  return executeWithAuthRetry(async () => {
+    try {
+      return await db.query(queryStr, bindings);
+    } catch (err: any) {
+      if (err.kind === 'NotFound' || err.message?.includes('does not exist') || err.message?.includes('NotFound')) {
+        return [[]];
+      }
+      throw err;
+    }
+  });
 }
 
 export async function safeSelect(recordId: StringRecordId | Table<string>): Promise<any> {
-  try {
-    return await db.select(recordId as any);
-  } catch (err: any) {
-    if (err.kind === 'NotFound' || err.message?.includes('does not exist') || err.message?.includes('NotFound')) {
-      return null;
+  return executeWithAuthRetry(async () => {
+    try {
+      return await db.select(recordId as any);
+    } catch (err: any) {
+      if (err.kind === 'NotFound' || err.message?.includes('does not exist') || err.message?.includes('NotFound')) {
+        return null;
+      }
+      throw err;
     }
-    throw err;
-  }
+  });
 }
 
 export async function safeMerge(recordId: StringRecordId, data: Record<string, any>): Promise<any> {
-  const recStr = recordId.toString();
-  const res: any = await db.query(`UPDATE type::record($id) MERGE $data`, { id: recStr, data });
-  return Array.isArray(res[0]) ? res[0][0] : res[0];
+  return executeWithAuthRetry(async () => {
+    const recStr = recordId.toString();
+    const res: any = await db.query(`UPDATE type::record($id) MERGE $data`, { id: recStr, data });
+    return Array.isArray(res[0]) ? res[0][0] : res[0];
+  });
+}
+
+export async function safeCreate(recordId: StringRecordId, data: Record<string, any>): Promise<any> {
+  return executeWithAuthRetry(async () => {
+    return await (db as any).create(recordId, data);
+  });
 }

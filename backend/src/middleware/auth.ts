@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { StringRecordId } from 'surrealdb';
 import admin, { firebaseInitialized } from '../config/firebase.js';
-import { db, safeSelect, safeMerge } from '../config/db.js';
+import { db, safeSelect, safeMerge, safeCreate } from '../config/db.js';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -98,7 +98,7 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
       }
       
       // Create user if they don't exist
-      const createResult = await (db as any).create(new StringRecordId(recordId), {
+      const createResult = await safeCreate(new StringRecordId(recordId), {
         name,
         email,
         firebaseUid,

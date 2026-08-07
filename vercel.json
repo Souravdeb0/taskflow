@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/tickets/dev/trigger-reminders",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
