@@ -8,6 +8,7 @@ import userRoutes from './routes/userRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/chats', chatRoutes);
+app.use('/api/ai', aiRoutes);
 app.use('/api', commentRoutes);
 
 // GLOBAL ERROR MIDDLEWARE

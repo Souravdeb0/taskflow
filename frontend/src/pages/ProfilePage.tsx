@@ -5,6 +5,7 @@ import { Ticket, ActivityLog } from '../types';
 import { api } from '../services/api';
 import { UserAvatar } from '../components/UserAvatar';
 import { Navbar } from '../components/Navbar';
+import { AICopilot } from '../components/AICopilot';
 import {
   UserCheck,
   Mail,
@@ -188,6 +189,9 @@ export const ProfilePage: React.FC = () => {
           )}
         </div>
       </main>
+
+      {/* Floating AI Copilot Chat Drawer */}
+      <AICopilot />
     </div>
   );
 };

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Ticket, User, Comment, ActivityLog } from '../types';
 import { api } from '../services/api';
 import { UserAvatar } from './UserAvatar';
-import { X, Send, UserPlus, MessageSquare, Activity } from 'lucide-react';
+import { X, Send, UserPlus, MessageSquare, Activity, Sparkles, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface TicketDrawerProps {
@@ -27,9 +27,12 @@ export const TicketDrawer: React.FC<TicketDrawerProps> = ({
   const [loadingComments, setLoadingComments] = useState(false);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
+  const [summary, setSummary] = useState('');
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   useEffect(() => {
     if (ticket) {
+      setSummary('');
       loadComments();
       loadActivities();
     }
@@ -102,6 +105,20 @@ export const TicketDrawer: React.FC<TicketDrawerProps> = ({
     }
   };
 
+  const handleGenerateSummary = async () => {
+    if (!ticket) return;
+    setLoadingSummary(true);
+    try {
+      const summaryText = await api.ai.summarize(ticket.id);
+      setSummary(summaryText);
+    } catch (err: any) {
+      console.error('Failed to generate summary:', err);
+      alert(err.message || 'Failed to generate summary');
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
   if (!ticket) return null;
 
   return (
@@ -139,6 +156,41 @@ export const TicketDrawer: React.FC<TicketDrawerProps> = ({
             <div className="glass-panel p-4 text-sm text-slate-800 leading-relaxed border-slate-200 bg-slate-50">
               {ticket.description || <span className="italic text-slate-400">No description provided for this ticket.</span>}
             </div>
+          </div>
+
+          {/* AI Ticket Summary */}
+          <div className="glass-panel p-5 bg-gradient-to-tr from-indigo-50/40 via-white to-purple-50/30 border-indigo-100 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-full blur-xl pointer-events-none" />
+            <div className="flex items-center justify-between mb-3 relative z-10">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                AI Summary & Insights
+              </h4>
+              {!summary && !loadingSummary && (
+                <button
+                  onClick={handleGenerateSummary}
+                  className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-bold transition-all shadow-sm flex items-center gap-1 hover:scale-[1.02]"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Generate
+                </button>
+              )}
+            </div>
+
+            {loadingSummary ? (
+              <div className="flex items-center gap-2 py-4 justify-center text-xs text-slate-400 italic">
+                <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                Processing comments & history...
+              </div>
+            ) : summary ? (
+              <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-line prose max-w-none">
+                {summary}
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-400 italic font-medium">
+                Need a quick summary of updates and comments? Click "Generate" to get insights instantly.
+              </p>
+            )}
           </div>
 
           {/* Assignees Section */}

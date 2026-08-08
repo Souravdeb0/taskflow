@@ -171,4 +171,22 @@ export const api = {
       body: JSON.stringify({ message }),
     });
   },
+
+  ai: {
+    summarize: async (ticketId: string): Promise<string> => {
+      const data = await fetchWithAuth('/ai/summarize', {
+        method: 'POST',
+        body: JSON.stringify({ ticketId }),
+      });
+      return data.summary;
+    },
+
+    chat: async (message: string, chatHistory: { role: 'user' | 'assistant'; content: string }[]): Promise<string> => {
+      const data = await fetchWithAuth('/ai/chat', {
+        method: 'POST',
+        body: JSON.stringify({ message, chatHistory }),
+      });
+      return data.reply;
+    },
+  },
 };

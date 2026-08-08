@@ -12,6 +12,7 @@ import { TicketDrawer } from '../components/TicketDrawer';
 import { ChatView } from '../components/ChatView';
 import { AdminPanel } from '../components/AdminPanel';
 import { SkeletonBoard, SkeletonList } from '../components/SkeletonLoader';
+import { AICopilot } from '../components/AICopilot';
 import { LayoutGrid, ListFilter, BarChart2, Filter, RefreshCw, MessageSquare, ShieldAlert } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
@@ -301,6 +302,9 @@ export const DashboardPage: React.FC = () => {
         onClose={() => setSelectedTicket(null)}
         onTicketUpdated={loadData}
       />
+
+      {/* Floating AI Copilot Chat Drawer */}
+      <AICopilot />
     </div>
   );
 };
