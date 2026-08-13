@@ -89,11 +89,11 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
       const normalizedEmail = (email || '').toLowerCase().trim();
       if (normalizedEmail === 'souravdeb803@gmail.com') {
         defaultRole = 'SuperAdmin';
-      } else if (firebaseUid === 'alice_uid') {
+      } else if (firebaseUid === 'alice_uid' || normalizedEmail === 'alice@example.com' || normalizedEmail.includes('admin')) {
         defaultRole = 'Admin';
-      } else if (firebaseUid === 'charlie_uid') {
+      } else if (firebaseUid === 'charlie_uid' || normalizedEmail === 'charlie@example.com' || normalizedEmail.includes('manager')) {
         defaultRole = 'Manager';
-      } else if (firebaseUid === 'bob_uid') {
+      } else if (firebaseUid === 'bob_uid' || normalizedEmail === 'bob@example.com') {
         defaultRole = 'Employee';
       }
       
@@ -113,18 +113,28 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
       const normalizedEmail = (userRecord.email || email || '').toLowerCase().trim();
       if (normalizedEmail === 'souravdeb803@gmail.com') {
         targetRole = 'SuperAdmin';
-      } else if (firebaseUid === 'alice_uid') {
+      } else if (firebaseUid === 'alice_uid' || normalizedEmail === 'alice@example.com' || normalizedEmail.includes('admin')) {
         targetRole = 'Admin';
-      } else if (firebaseUid === 'charlie_uid') {
+      } else if (firebaseUid === 'charlie_uid' || normalizedEmail === 'charlie@example.com' || normalizedEmail.includes('manager')) {
         targetRole = 'Manager';
-      } else if (firebaseUid === 'bob_uid') {
+      } else if (firebaseUid === 'bob_uid' || normalizedEmail === 'bob@example.com') {
         targetRole = 'Employee';
       }
 
-      if (userRecord.role !== targetRole) {
-        const updateResult = await safeMerge(new StringRecordId(recordId), { role: targetRole });
+      const needsNameUpdate = name && userRecord.name !== name;
+      const needsEmailUpdate = email && userRecord.email !== email;
+      const needsRoleUpdate = userRecord.role !== targetRole;
+
+      if (needsNameUpdate || needsEmailUpdate || needsRoleUpdate) {
+        const updateData: any = {};
+        if (needsNameUpdate) updateData.name = name;
+        if (needsEmailUpdate) updateData.email = email;
+        if (needsRoleUpdate) updateData.role = targetRole;
+        if (!userRecord.firebaseUid && firebaseUid) updateData.firebaseUid = firebaseUid;
+
+        const updateResult = await safeMerge(new StringRecordId(recordId), updateData);
         userRecord = Array.isArray(updateResult) ? updateResult[0] : updateResult;
-        console.log(`Updated role for user ${recordId} to ${targetRole}`);
+        console.log(`Updated profile data/role for user ${recordId}`);
       }
     }
 

@@ -86,6 +86,8 @@ export async function safeMerge(recordId: StringRecordId, data: Record<string, a
 
 export async function safeCreate(recordId: StringRecordId, data: Record<string, any>): Promise<any> {
   return executeWithAuthRetry(async () => {
-    return await (db as any).create(recordId, data);
+    const recStr = recordId.toString();
+    const res: any = await db.query(`CREATE type::record($id) CONTENT $data`, { id: recStr, data });
+    return Array.isArray(res[0]) ? res[0][0] : res[0];
   });
 }

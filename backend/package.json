@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Backend API for Jira Lite using Express and SurrealDB",
   "main": "dist/server.js",
-  "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
@@ -14,10 +13,12 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "firebase-admin": "^12.1.0",
+    "iconv-lite": "^0.4.24",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.13",
     "openai": "^7.4.0",
-    "surrealdb": "^2.0.6",
+    "qs": "^6.15.3",
+    "surrealdb": "^2.0.8",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -26,7 +27,7 @@
     "@types/node": "^20.12.7",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.15",
-    "tsx": "^4.7.2",
+    "tsx": "^4.23.12",
     "typescript": "^5.4.5"
   }
 }

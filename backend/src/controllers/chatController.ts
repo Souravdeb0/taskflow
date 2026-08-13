@@ -9,7 +9,7 @@ export async function createChatHandler(req: AuthenticatedRequest, res: Response
     const { name, members } = req.body;
     const creatorId = req.user!.id;
 
-    if (req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
+    if (req.user?.role !== 'SuperAdmin' && req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
       return res.status(403).json({ error: 'Forbidden: Only Managers or Admins can create chat rooms' });
     }
 
@@ -26,14 +26,13 @@ export async function createChatHandler(req: AuthenticatedRequest, res: Response
       memberRecordIds.push(new StringRecordId(creatorId));
     }
 
-    const rawChat = await (db as any).create(new Table('chat'), {
+    const rawChat: any = await safeQuery('CREATE chat CONTENT $data', { data: {
       name: name.trim(),
-      created_by: new StringRecordId(creatorId),
       members: memberRecordIds,
+      created_by: new StringRecordId(creatorId),
       created_at: now,
-    });
-
-    const chat = Array.isArray(rawChat) ? rawChat[0] : rawChat;
+    }});
+    const chat = Array.isArray(rawChat[0]) ? rawChat[0][0] : rawChat[0];
     res.status(201).json({ message: 'Chat room created successfully', chat });
   } catch (error) {
     console.error('Failed to create chat:', error);
@@ -177,16 +176,15 @@ export async function sendMessageHandler(req: AuthenticatedRequest, res: Respons
     }
 
     const now = new Date().toISOString();
-    const rawMsg = await (db as any).create(new Table('chat_message'), {
+    const rawMsg: any = await safeQuery('CREATE chat_message CONTENT $data', { data: {
       chat_id: new StringRecordId(chatRecordId),
       sender_id: new StringRecordId(userId),
       sender_name: req.user!.name,
       message: message.trim(),
       created_at: now,
-    });
-
-    const msg = Array.isArray(rawMsg) ? rawMsg[0] : rawMsg;
-    res.status(201).json({ message: 'Message sent successfully', chat_message: msg });
+    }});
+    const newMsg = Array.isArray(rawMsg[0]) ? rawMsg[0][0] : rawMsg[0];
+    res.status(201).json({ message: 'Message sent successfully', chat_message: newMsg });
   } catch (error) {
     console.error('Failed to send message:', error);
     res.status(500).json({ error: 'Failed to send message' });

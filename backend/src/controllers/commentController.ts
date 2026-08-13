@@ -41,13 +41,13 @@ export async function addCommentHandler(req: AuthenticatedRequest, res: Response
 
     const now = new Date().toISOString();
 
-    const rawComment = await (db as any).create(new Table('comment'), {
+    const rawComment: any = await safeQuery('CREATE comment CONTENT $data', { data: {
       ticket_id: new StringRecordId(ticketRecordId),
       user_id: new StringRecordId(authorId),
       comment: commentText,
       created_at: now,
-    });
-    const comment = Array.isArray(rawComment) ? rawComment[0] : rawComment;
+    }});
+    const comment = Array.isArray(rawComment[0]) ? rawComment[0][0] : rawComment[0];
 
     await logActivity(ticketRecordId, authorId, 'COMMENT_ADDED', null, commentText);
     await safeMerge(new StringRecordId(ticketRecordId), { updated_at: now });

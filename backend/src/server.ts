@@ -1,6 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+dotenv.config();
+
 import { connectDB } from './config/db.js';
 import { startReminderCron } from './services/cronService.js';
 import authRoutes from './routes/authRoutes.js';
@@ -9,9 +11,6 @@ import ticketRoutes from './routes/ticketRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
-
-dotenv.config();
-
 const PORT = process.env.PORT || 5001;
 const app = express();
 
@@ -44,12 +43,14 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 
 // SERVER STARTUP
 async function startServer() {
-  await connectDB();
-  startReminderCron();
-
-  app.listen(PORT, () => {
-    console.log(`TaskFlow server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-  });
+    console.log('Starting connectDB...');
+    await connectDB();
+    console.log('connectDB finished. Starting cron...');
+    startReminderCron();
+    console.log('Cron started. Starting express listen...');
+    app.listen(PORT, () => {
+        console.log(`TaskFlow server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+    });
 }
 
 if (!process.env.VERCEL) {

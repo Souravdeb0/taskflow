@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Send, X, Bot, Sparkles, MessageSquare, Loader2, ArrowRight } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -11,12 +12,14 @@ interface Message {
 export const AICopilot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Message[]>([
-    {
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = sessionStorage.getItem('taskflow_copilot_chat');
+    if (saved) return JSON.parse(saved);
+    return [{
       role: 'assistant',
       content: "Hello! I am your TaskFlow Copilot. Ask me anything about tickets, task statuses, or team workloads in your workspace!",
-    },
-  ]);
+    }];
+  });
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -32,8 +35,22 @@ export const AICopilot: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  // Save to session storage whenever messages change
+  useEffect(() => {
+    sessionStorage.setItem('taskflow_copilot_chat', JSON.stringify(messages));
+  }, [messages]);
+
+  const [lastMessageTime, setLastMessageTime] = useState(0);
+
   const handleSendMessage = async (textToSend: string) => {
     if (!textToSend.trim() || isLoading) return;
+
+    const now = Date.now();
+    if (now - lastMessageTime < 3000) {
+      setMessages(prev => [...prev, { role: 'assistant', content: '⏳ Please wait a few seconds before sending another message to avoid rate limits.' }]);
+      return;
+    }
+    setLastMessageTime(now);
 
     const userMsg: Message = { role: 'user', content: textToSend };
     setMessages(prev => [...prev, userMsg]);
@@ -41,8 +58,9 @@ export const AICopilot: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Send message to backend with history (excluding current user message to avoid duplicate addition)
-      const chatHistory = messages.map(m => ({ role: m.role, content: m.content }));
+      // Send message to backend with history (limit to last 15 messages to save tokens)
+      const recentMessages = messages.slice(-15);
+      const chatHistory = recentMessages.map(m => ({ role: m.role, content: m.content }));
       const response = await api.ai.chat(textToSend, chatHistory);
       
       setMessages(prev => [...prev, { role: 'assistant', content: response }]);
@@ -118,9 +136,8 @@ export const AICopilot: React.FC = () => {
                         : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
                     }`}
                   >
-                    {/* Render helper to support simple markdown lines */}
-                    <div className="space-y-1 whitespace-pre-line">
-                      {msg.content}
+                    <div className="space-y-1 markdown-prose">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
                   </div>
                 </div>

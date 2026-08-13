@@ -1,5 +1,5 @@
-import { Table, StringRecordId } from 'surrealdb';
-import { db } from '../config/db.js';
+import { StringRecordId } from 'surrealdb';
+import { safeQuery } from '../config/db.js';
 
 export async function logActivity(
   ticketId: any,
@@ -15,14 +15,14 @@ export async function logActivity(
     const ticketRecord = tStr.startsWith('ticket:') ? tStr : `ticket:${tStr}`;
     const userRecord = uStr.startsWith('user:') ? uStr : `user:${uStr}`;
 
-    await (db as any).create(new Table('activity_log'), {
+    await safeQuery('CREATE activity_log CONTENT $data', { data: {
       ticket_id: new StringRecordId(ticketRecord),
       user_id: new StringRecordId(userRecord),
       action,
       old_value: oldValue,
       new_value: newValue,
       created_at: new Date().toISOString(),
-    });
+    }});
   } catch (error) {
     console.error('Failed to log activity in SurrealDB:', error);
   }

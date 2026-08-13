@@ -88,7 +88,7 @@ export async function getTicketByIdHandler(req: AuthenticatedRequest, res: Respo
 
 export async function createTicketHandler(req: AuthenticatedRequest, res: Response) {
   try {
-    if (req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
+    if (req.user?.role !== 'SuperAdmin' && req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
       return res.status(403).json({ error: 'Forbidden: Only Managers or Admins can create tickets' });
     }
 
@@ -96,7 +96,7 @@ export async function createTicketHandler(req: AuthenticatedRequest, res: Respon
     const creatorId = req.user!.id;
     const now = new Date().toISOString();
 
-    const rawResult = await (db as any).create(new Table('ticket'), {
+    const rawResult: any = await safeQuery('CREATE ticket CONTENT $data', { data: {
       title,
       description,
       status: status || 'Todo',
@@ -104,9 +104,9 @@ export async function createTicketHandler(req: AuthenticatedRequest, res: Respon
       created_by: new StringRecordId(creatorId),
       created_at: now,
       updated_at: now,
-    });
+    }});
     
-    const ticket = Array.isArray(rawResult) ? rawResult[0] : rawResult;
+    const ticket = Array.isArray(rawResult[0]) ? rawResult[0][0] : rawResult[0];
 
     await logActivity(ticket.id, creatorId, 'TICKET_CREATED', null, title);
 
@@ -154,7 +154,7 @@ export async function updateTicketHandler(req: AuthenticatedRequest, res: Respon
           return res.status(403).json({ error: 'Forbidden: Employees can only update status of tickets assigned to them' });
         }
       }
-    } else if (req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
+    } else if (req.user?.role !== 'SuperAdmin' && req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
       return res.status(403).json({ error: 'Forbidden: Unauthorized' });
     }
 
@@ -189,7 +189,7 @@ export async function updateTicketHandler(req: AuthenticatedRequest, res: Respon
 
 export async function deleteTicketHandler(req: AuthenticatedRequest, res: Response) {
   try {
-    if (req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
+    if (req.user?.role !== 'SuperAdmin' && req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
       return res.status(403).json({ error: 'Forbidden: Only Managers or Admins can delete tickets' });
     }
 
@@ -217,7 +217,7 @@ export async function deleteTicketHandler(req: AuthenticatedRequest, res: Respon
 
 export async function assignUserHandler(req: AuthenticatedRequest, res: Response) {
   try {
-    if (req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
+    if (req.user?.role !== 'SuperAdmin' && req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
       return res.status(403).json({ error: 'Forbidden: Only Managers or Admins can assign users' });
     }
 
@@ -249,13 +249,13 @@ export async function assignUserHandler(req: AuthenticatedRequest, res: Response
     }
 
     const now = new Date().toISOString();
-    const rawAssignment = await (db as any).create(new Table('ticket_assignee'), {
+    const rawAssignment: any = await safeQuery('CREATE ticket_assignee CONTENT $data', { data: {
       ticket_id: new StringRecordId(ticketRecordId),
       user_id: new StringRecordId(userRecordId),
       assigned_by: new StringRecordId(assignerId),
       assigned_at: now,
-    });
-    const assignment = Array.isArray(rawAssignment) ? rawAssignment[0] : rawAssignment;
+    }});
+    const assignment = Array.isArray(rawAssignment[0]) ? rawAssignment[0][0] : rawAssignment[0];
 
     await logActivity(ticketRecordId, assignerId, 'ASSIGNEE_ADDED', null, assigneeUser.name || assigneeUser.email);
     await safeMerge(new StringRecordId(ticketRecordId), { updated_at: now });
@@ -269,7 +269,7 @@ export async function assignUserHandler(req: AuthenticatedRequest, res: Response
 
 export async function unassignUserHandler(req: AuthenticatedRequest, res: Response) {
   try {
-    if (req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
+    if (req.user?.role !== 'SuperAdmin' && req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
       return res.status(403).json({ error: 'Forbidden: Only Managers or Admins can unassign users' });
     }
 

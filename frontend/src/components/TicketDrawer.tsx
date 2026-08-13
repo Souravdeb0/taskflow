@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Ticket, User, Comment, ActivityLog } from '../types';
 import { api } from '../services/api';
 import { UserAvatar } from './UserAvatar';
@@ -32,7 +33,8 @@ export const TicketDrawer: React.FC<TicketDrawerProps> = ({
 
   useEffect(() => {
     if (ticket) {
-      setSummary('');
+      const cachedSummary = sessionStorage.getItem(`taskflow_summary_${ticket.id}`);
+      setSummary(cachedSummary || '');
       loadComments();
       loadActivities();
     }
@@ -107,10 +109,19 @@ export const TicketDrawer: React.FC<TicketDrawerProps> = ({
 
   const handleGenerateSummary = async () => {
     if (!ticket) return;
+
+    const cacheKey = `taskflow_summary_${ticket.id}`;
+    const cachedSummary = sessionStorage.getItem(cacheKey);
+    if (cachedSummary) {
+      setSummary(cachedSummary);
+      return;
+    }
+
     setLoadingSummary(true);
     try {
       const summaryText = await api.ai.summarize(ticket.id);
       setSummary(summaryText);
+      sessionStorage.setItem(cacheKey, summaryText);
     } catch (err: any) {
       console.error('Failed to generate summary:', err);
       alert(err.message || 'Failed to generate summary');
@@ -183,8 +194,8 @@ export const TicketDrawer: React.FC<TicketDrawerProps> = ({
                 Processing comments & history...
               </div>
             ) : summary ? (
-              <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-line prose max-w-none">
-                {summary}
+              <div className="text-xs text-slate-700 leading-relaxed max-w-none markdown-prose">
+                <ReactMarkdown>{summary}</ReactMarkdown>
               </div>
             ) : (
               <p className="text-[11px] text-slate-400 italic font-medium">
