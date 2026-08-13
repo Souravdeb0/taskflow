@@ -232,7 +232,7 @@ Guidelines:
 
       // Add the function response to context
       contents.push({
-        role: 'function',
+        role: 'user',
         parts: [{
           functionResponse: {
             name: call.name,
