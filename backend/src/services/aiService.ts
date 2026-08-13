@@ -50,29 +50,39 @@ Ticket Details:
 `;
 
   try {
-    const response = await fetch(`${baseURL.replace(/\/$/, '')}/${modelName}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: 'You generate professional, structured markdown summaries of project tickets.' }]
+    let response;
+    let retries = 3;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      response = await fetch(`${baseURL.replace(/\/$/, '')}/${modelName}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
         },
-        contents: [{
-          role: 'user',
-          parts: [{ text: prompt }]
-        }]
-      })
-    });
-    
-    if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Rate limit exceeded (HTTP 429). The Gemini API free tier allows a limited number of requests per minute. Please wait a moment and try again.');
-        }
-        throw new Error(`HTTP error! status: ${response.status} ${await response.text()}`);
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: 'You generate professional, structured markdown summaries of project tickets.' }]
+          },
+          contents: [{
+            role: 'user',
+            parts: [{ text: prompt }]
+          }]
+        })
+      });
+      
+      if (!response.ok) {
+          if (response.status === 429) {
+            if (attempt < retries) {
+              console.warn(`Summary rate limit hit (429). Retrying in ${attempt * 3} seconds... (Attempt ${attempt} of ${retries})`);
+              await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+              continue;
+            }
+            throw new Error('Rate limit exceeded (HTTP 429) after multiple retries. The Gemini API free tier allows a limited number of requests per minute. Please wait a moment and try again.');
+          }
+          throw new Error(`HTTP error! status: ${response.status} ${await response.text()}`);
+      }
+      break;
     }
-    const data = await response.json();
+    const data = await response!.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Failed to generate summary.';
   } catch (error: any) {
     console.error('Error calling LLM for ticket summary:', error);
@@ -172,24 +182,31 @@ Guidelines:
   }];
 
   try {
-    const makeRequest = async (currentContents: any[]) => {
-      const response = await fetch(`${baseURL.replace(/\/$/, '')}/${modelName}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: currentContents,
-          tools: tools
-        })
-      });
-      
-      if (!response.ok) {
-          if (response.status === 429) {
-            throw new Error('Rate limit exceeded (HTTP 429). The Gemini API free tier allows a limited number of requests per minute. Please wait a moment and try again.');
-          }
-          throw new Error(`HTTP error! status: ${response.status} ${await response.text()}`);
+    const makeRequest = async (currentContents: any[], retries = 3): Promise<any> => {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        const response = await fetch(`${baseURL.replace(/\/$/, '')}/${modelName}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: currentContents,
+            tools: tools
+          })
+        });
+        
+        if (!response.ok) {
+            if (response.status === 429) {
+              if (attempt < retries) {
+                console.warn(`Rate limit hit (429). Retrying in ${attempt * 3} seconds... (Attempt ${attempt} of ${retries})`);
+                await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+                continue;
+              }
+              throw new Error('Rate limit exceeded (HTTP 429) after multiple retries. The Gemini API free tier allows a limited number of requests per minute. Please wait a moment and try again.');
+            }
+            throw new Error(`HTTP error! status: ${response.status} ${await response.text()}`);
+        }
+        return await response.json();
       }
-      return await response.json();
     };
 
     let data = await makeRequest(contents);
