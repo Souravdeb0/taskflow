@@ -205,6 +205,7 @@ Guidelines:
     const decoder = new TextDecoder();
     let buffer = '';
     let fullFunctionCall: any = null;
+    let modelParts: any[] = [];
 
     for await (const chunk of response!.body as any) {
       buffer += decoder.decode(chunk, { stream: true });
@@ -216,27 +217,34 @@ Guidelines:
           if (dataStr === '[DONE]') continue;
           try {
             const data = JSON.parse(dataStr);
-            const part = data.candidates?.[0]?.content?.parts?.[0];
-            if (part?.text) yield part.text;
-            if (part?.functionCall) fullFunctionCall = part.functionCall; // Capture function call
+            const parts = data.candidates?.[0]?.content?.parts;
+            if (parts) {
+              for (const part of parts) {
+                if (part.text) yield part.text;
+                if (part.functionCall) fullFunctionCall = part.functionCall;
+                if (!part.text) modelParts.push(part); // Capture thought_signature, executableCode, etc.
+              }
+            }
           } catch (e) {}
         }
       }
     }
-    return fullFunctionCall;
+    return { fullFunctionCall, modelParts };
   };
 
   try {
     let currentContents = contents;
     while (true) {
-      let functionCallResult = yield* makeRequestStream(currentContents);
+      let streamResult: any = yield* makeRequestStream(currentContents);
       
-      if (!functionCallResult) {
+      if (!streamResult?.fullFunctionCall) {
         break; // Text generation finished natively
       }
 
-      const call = functionCallResult;
-      currentContents.push({ role: 'model', parts: [{ functionCall: call }] });
+      const call = streamResult.fullFunctionCall;
+      
+      // Push all accumulated non-text parts (including thought_signature and the functionCall itself) back to context
+      currentContents.push({ role: 'model', parts: streamResult.modelParts.length ? streamResult.modelParts : [{ functionCall: call }] });
 
       let resultData: any = '';
 
