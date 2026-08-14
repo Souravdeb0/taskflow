@@ -70,13 +70,13 @@ Ticket Details:
       });
       
       if (!response.ok) {
-          if (response.status === 429) {
+          if (response.status === 429 || response.status === 503) {
             if (attempt < retries) {
-              console.warn(`Summary rate limit hit (429). Retrying in ${attempt * 3} seconds... (Attempt ${attempt} of ${retries})`);
+              console.warn(`Summary rate limit or 503 hit (${response.status}). Retrying in ${attempt * 3} seconds... (Attempt ${attempt} of ${retries})`);
               await new Promise(resolve => setTimeout(resolve, attempt * 3000));
               continue;
             }
-            throw new Error('Rate limit exceeded (HTTP 429) after multiple retries. The Gemini API free tier allows a limited number of requests per minute. Please wait a moment and try again.');
+            throw new Error(`API error (${response.status}) after multiple retries. The model may be overloaded or you hit a rate limit. Please try again later.`);
           }
           throw new Error(`HTTP error! status: ${response.status} ${await response.text()}`);
       }
@@ -195,13 +195,13 @@ Guidelines:
         });
         
         if (!response.ok) {
-            if (response.status === 429) {
+            if (response.status === 429 || response.status === 503) {
               if (attempt < retries) {
-                console.warn(`Rate limit hit (429). Retrying in ${attempt * 3} seconds... (Attempt ${attempt} of ${retries})`);
+                console.warn(`Rate limit or 503 hit (${response.status}). Retrying in ${attempt * 3} seconds... (Attempt ${attempt} of ${retries})`);
                 await new Promise(resolve => setTimeout(resolve, attempt * 3000));
                 continue;
               }
-              throw new Error('Rate limit exceeded (HTTP 429) after multiple retries. The Gemini API free tier allows a limited number of requests per minute. Please wait a moment and try again.');
+              throw new Error(`API error (${response.status}) after multiple retries. The model may be overloaded or you hit a rate limit. Please try again later.`);
             }
             throw new Error(`HTTP error! status: ${response.status} ${await response.text()}`);
         }
