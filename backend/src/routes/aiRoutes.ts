@@ -54,6 +54,7 @@ router.post('/chat', authMiddleware as any, async (req: AuthenticatedRequest, re
 
     // 3. Get current authenticated user context
     const currentUser = {
+      id: req.user?.id || '',
       name: req.user?.name || 'User',
       role: req.user?.role || 'Employee'
     };

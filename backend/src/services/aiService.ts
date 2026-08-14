@@ -1,4 +1,4 @@
-import { safeMerge } from '../config/db.js';
+import { safeMerge, safeQuery } from '../config/db.js';
 import { StringRecordId } from 'surrealdb';
 
 const requestCounts = new Map<string, { count: number, resetTime: number }>();
@@ -102,7 +102,7 @@ export async function* chatWithCopilotStream(
   chatHistory: { role: 'user' | 'assistant'; content: string }[],
   tickets: any[],
   users: any[],
-  currentUser: { name: string; role: string }
+  currentUser: { id: string; name: string; role: string }
 ): AsyncGenerator<string, void, unknown> {
   const { apiKey, baseURL, modelName } = getAIConfig();
 
@@ -171,6 +171,11 @@ Guidelines:
       {
         name: 'fetchUsers',
         description: 'Fetches all team members in the workspace.',
+        parameters: { type: 'OBJECT', properties: {} }
+      },
+      {
+        name: 'fetchUserStats',
+        description: 'Fetches statistics about the current user, such as how many chat messages they have sent in the team workspace.',
         parameters: { type: 'OBJECT', properties: {} }
       }
     ]
@@ -271,6 +276,19 @@ Guidelines:
         resultData = filtered.length ? filtered.map(t => `- [${t.id}] ${t.title} (${t.status}, ${t.priority})`).join('\n') : 'No tickets found.';
       } else if (call.name === 'fetchUsers') {
         resultData = users.map(u => `- ${u.name} (${u.role})`).join('\n');
+      } else if (call.name === 'fetchUserStats') {
+        let chatCount = 0;
+        try {
+          const userIdStr = currentUser.id || '';
+          if (userIdStr) {
+            // Count chat messages from this user
+            const rawMsgCount = await safeQuery('SELECT count() FROM chat_message WHERE sender_id = $userId GROUP BY all', { userId: new StringRecordId(userIdStr) });
+            chatCount = rawMsgCount?.[0]?.[0]?.count || 0;
+          }
+        } catch(e: any) {
+          console.error('Error fetching user stats:', e);
+        }
+        resultData = `You have sent ${chatCount} chat messages on the platform.`;
       }
 
       currentContents.push({
