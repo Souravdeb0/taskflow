@@ -82,8 +82,8 @@ export async function updateChatMembersHandler(req: AuthenticatedRequest, res: R
       return res.status(404).json({ error: 'Chat room not found' });
     }
 
-    const creatorIdStr = typeof chat.created_by === 'string' ? chat.created_by : chat.created_by.id;
-    if (userRole !== 'Admin' && creatorIdStr !== userId) {
+    const creatorIdStr = chat.created_by?.toString() || '';
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin' && creatorIdStr !== userId) {
       return res.status(403).json({ error: 'Forbidden: Only the chat creator or an Admin can manage members' });
     }
 
