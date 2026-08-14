@@ -173,20 +173,112 @@ export const api = {
   },
 
   ai: {
-    summarize: async (ticketId: string): Promise<string> => {
-      const data = await fetchWithAuth('/ai/summarize', {
+    summarize: async (ticketId: string, onChunk?: (chunk: string) => void): Promise<string> => {
+      const mockUserJson = localStorage.getItem('taskflow_user');
+      let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (mockUserJson) {
+        const user = JSON.parse(mockUserJson);
+        headers['x-mock-user-uid'] = user.firebaseUid || user.id.replace('user:', '');
+        headers['x-mock-user-name'] = user.name;
+        headers['x-mock-user-email'] = user.email;
+      }
+      const token = localStorage.getItem('taskflow_firebase_token');
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${API_BASE}/ai/summarize`, {
         method: 'POST',
+        headers,
         body: JSON.stringify({ ticketId }),
       });
-      return data.summary;
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      if (!response.body) throw new Error('ReadableStream not supported.');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullSummary = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim();
+            if (dataStr === '[DONE]') continue;
+            try {
+              const { chunk } = JSON.parse(dataStr);
+              if (chunk) {
+                fullSummary += chunk;
+                if (onChunk) onChunk(chunk);
+              }
+            } catch (e) {}
+          }
+        }
+      }
+      return fullSummary;
     },
 
-    chat: async (message: string, chatHistory: { role: 'user' | 'assistant'; content: string }[]): Promise<string> => {
-      const data = await fetchWithAuth('/ai/chat', {
+    chat: async (
+      message: string, 
+      chatHistory: { role: 'user' | 'assistant'; content: string }[],
+      onChunk?: (chunk: string) => void
+    ): Promise<string> => {
+      const mockUserJson = localStorage.getItem('taskflow_user');
+      let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (mockUserJson) {
+        const user = JSON.parse(mockUserJson);
+        headers['x-mock-user-uid'] = user.firebaseUid || user.id.replace('user:', '');
+        headers['x-mock-user-name'] = user.name;
+        headers['x-mock-user-email'] = user.email;
+      }
+      const token = localStorage.getItem('taskflow_firebase_token');
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${API_BASE}/ai/chat`, {
         method: 'POST',
+        headers,
         body: JSON.stringify({ message, chatHistory }),
       });
-      return data.reply;
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      if (!response.body) throw new Error('ReadableStream not supported.');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullReply = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim();
+            if (dataStr === '[DONE]') continue;
+            try {
+              const { chunk } = JSON.parse(dataStr);
+              if (chunk) {
+                fullReply += chunk;
+                if (onChunk) onChunk(chunk);
+              }
+            } catch (e) {}
+          }
+        }
+      }
+      return fullReply;
     },
   },
 };

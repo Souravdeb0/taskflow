@@ -3,7 +3,6 @@ import { StringRecordId } from 'surrealdb';
 
 const requestCounts = new Map<string, { count: number, resetTime: number }>();
 
-// Read dynamically to avoid import hoisting loading issues with dotenv
 function getAIConfig() {
   return {
     apiKey: process.env.AI_API_KEY,
@@ -14,29 +13,24 @@ function getAIConfig() {
 
 if (process.env.AI_API_KEY) {
   console.log(`AI Service initialized natively with model: ${process.env.AI_MODEL_NAME}`);
-} else {
-  // It might still be undefined here if this file is imported before dotenv config runs
 }
 
-// Generate summary for a ticket
-export async function generateTicketSummary(ticket: any): Promise<string> {
+export async function* generateTicketSummaryStream(ticket: any): AsyncGenerator<string, void, unknown> {
   const { apiKey, baseURL, modelName } = getAIConfig();
 
   if (!apiKey) {
-    return `### [DEMO SUMMARY] ${ticket.title}
-This is a mock ticket summary because no **AI_API_KEY** was configured in the environment variables.
-
-*   **Status:** ${ticket.status}
-*   **Priority:** ${ticket.priority}
-*   **Assignee:** ${ticket.assignee || 'Unassigned'}
-*   **Description:** ${ticket.description || 'No description provided.'}
-*   **Mock Analysis:** Please configure your custom open-source LLM endpoint to enable intelligent summaries!`;
+    yield `### [DEMO SUMMARY] ${ticket.title}\n`;
+    yield `This is a mock ticket summary because no **AI_API_KEY** was configured.\n\n`;
+    yield `*   **Status:** ${ticket.status}\n`;
+    yield `*   **Priority:** ${ticket.priority}\n`;
+    yield `*   **Assignee:** ${ticket.assignee || 'Unassigned'}\n`;
+    return;
   }
 
-  const prompt = `You are a helpful project manager. Summarize the following ticket details, updates, and comments. 
+  const prompt = `You are a helpful project manager. Summarize the following ticket details.
 Generate a clear, structured summary in Markdown including:
 1. Current Status & Progress
-2. Critical Decisions or Blockers (if any)
+2. Critical Decisions or Blockers
 3. Recommended Next Actions
 
 Ticket Details:
@@ -50,65 +44,72 @@ Ticket Details:
 `;
 
   try {
-    let response;
+    let response: Response;
     let retries = 3;
     for (let attempt = 1; attempt <= retries; attempt++) {
-      response = await fetch(`${baseURL.replace(/\/$/, '')}/${modelName}:generateContent?key=${apiKey}`, {
+      response = await fetch(`${baseURL.replace(/\/$/, '')}/${modelName}:streamGenerateContent?alt=sse&key=${apiKey}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: 'You generate professional, structured markdown summaries of project tickets.' }]
-          },
-          contents: [{
-            role: 'user',
-            parts: [{ text: prompt }]
-          }]
+          systemInstruction: { parts: [{ text: 'You generate professional, structured markdown summaries of project tickets.' }] },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }]
         })
       });
       
       if (!response.ok) {
           if (response.status === 429 || response.status === 503) {
             if (attempt < retries) {
-              console.warn(`Summary rate limit or 503 hit (${response.status}). Retrying in ${attempt * 3} seconds... (Attempt ${attempt} of ${retries})`);
+              console.warn(`Summary rate limit or 503 hit (${response.status}). Retrying in ${attempt * 3} seconds...`);
               await new Promise(resolve => setTimeout(resolve, attempt * 3000));
               continue;
             }
-            throw new Error(`API error (${response.status}) after multiple retries. The model may be overloaded or you hit a rate limit. Please try again later.`);
+            throw new Error(`API error (${response.status}) after multiple retries.`);
           }
           throw new Error(`HTTP error! status: ${response.status} ${await response.text()}`);
       }
       break;
     }
-    const data = await response!.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Failed to generate summary.';
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    for await (const chunk of response!.body as any) {
+      buffer += decoder.decode(chunk, { stream: true });
+      let lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const dataStr = line.trim().slice(6);
+          if (dataStr === '[DONE]') continue;
+          try {
+            const data = JSON.parse(dataStr);
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) yield text;
+          } catch (e) {
+            // Ignore parse errors for incomplete chunks if any
+          }
+        }
+      }
+    }
   } catch (error: any) {
     console.error('Error calling LLM for ticket summary:', error);
-    throw new Error(`LLM Summary call failed: ${error.message || error}`);
+    yield `\n\n**Error:** ${error.message || error}`;
   }
 }
 
-// Chat assistant with project context
-export async function chatWithCopilot(
+export async function* chatWithCopilotStream(
   message: string,
   chatHistory: { role: 'user' | 'assistant'; content: string }[],
   tickets: any[],
   users: any[],
   currentUser: { name: string; role: string }
-): Promise<string> {
+): AsyncGenerator<string, void, unknown> {
   const { apiKey, baseURL, modelName } = getAIConfig();
 
   if (!apiKey) {
-    return `Hi ${currentUser.name}! I am currently running in **demo mode** because no **AI_API_KEY** is configured in your project settings.
-
-However, I can see that there are currently **${tickets.length} tickets** and **${users.length} team members** in your workspace!
-
-To activate my full brain using your custom open-source LLM, please add the following environment variables in Vercel or your local \`.env\` file:
-*   \`AI_API_URL\`
-*   \`AI_API_KEY\`
-*   \`AI_MODEL_NAME\``;
+    yield `Hi ${currentUser.name}! I am currently running in **demo mode**.\n`;
+    yield `Please add the AI_API_KEY environment variable.`;
+    return;
   }
 
   const now = Date.now();
@@ -118,7 +119,8 @@ To activate my full brain using your custom open-source LLM, please add the foll
     userRate.resetTime = now + 60000;
   } else {
     if (userRate.count >= 10) {
-      return 'Rate limit exceeded (Backend limits). Please wait a minute before sending more messages.';
+      yield 'Rate limit exceeded (Backend limits). Please wait a minute before sending more messages.';
+      return;
     }
     userRate.count++;
   }
@@ -131,18 +133,14 @@ Guidelines:
 1. You do not have the tickets or users in your context by default. If the user asks about tickets or team members, you MUST use the fetchTickets or fetchUsers tools to retrieve them.
 2. If the user asks to update a ticket, use the updateTicket tool.
 3. Be professional, clear, and use markdown formatting for lists or tables.
-4. Keep your answers concise and focused.
-`;
+4. Keep your answers concise and focused.`;
 
   const mappedHistory = chatHistory.map(h => ({
     role: h.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: h.content }]
   }));
 
-  const contents = [
-    ...mappedHistory,
-    { role: 'user', parts: [{ text: message }] }
-  ];
+  const contents = [...mappedHistory, { role: 'user', parts: [{ text: message }] }];
 
   const tools = [{
     functionDeclarations: [
@@ -152,7 +150,7 @@ Guidelines:
         parameters: {
           type: 'OBJECT',
           properties: {
-            ticketId: { type: 'STRING', description: 'The exact ID of the ticket, e.g. ticket:v982nulkqq468q0z3uwz' },
+            ticketId: { type: 'STRING', description: 'The exact ID of the ticket' },
             status: { type: 'STRING', description: 'The new status to set, e.g., Todo, In Progress, Done' },
             priority: { type: 'STRING', description: 'The new priority to set, e.g., Low, Medium, High' }
           },
@@ -165,59 +163,80 @@ Guidelines:
         parameters: {
           type: 'OBJECT',
           properties: {
-            priority: { type: 'STRING', description: 'Optional priority filter, e.g., Low, Medium, High' },
-            status: { type: 'STRING', description: 'Optional status filter, e.g., Todo, In Progress, Done' }
+            priority: { type: 'STRING', description: 'Optional priority filter' },
+            status: { type: 'STRING', description: 'Optional status filter' }
           }
         }
       },
       {
         name: 'fetchUsers',
         description: 'Fetches all team members in the workspace.',
-        parameters: {
-          type: 'OBJECT',
-          properties: {}
-        }
+        parameters: { type: 'OBJECT', properties: {} }
       }
     ]
   }];
 
-  try {
-    const makeRequest = async (currentContents: any[], retries = 3): Promise<any> => {
-      for (let attempt = 1; attempt <= retries; attempt++) {
-        const response = await fetch(`${baseURL.replace(/\/$/, '')}/${modelName}:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: currentContents,
-            tools: tools
-          })
-        });
-        
-        if (!response.ok) {
-            if (response.status === 429 || response.status === 503) {
-              if (attempt < retries) {
-                console.warn(`Rate limit or 503 hit (${response.status}). Retrying in ${attempt * 3} seconds... (Attempt ${attempt} of ${retries})`);
-                await new Promise(resolve => setTimeout(resolve, attempt * 3000));
-                continue;
-              }
-              throw new Error(`API error (${response.status}) after multiple retries. The model may be overloaded or you hit a rate limit. Please try again later.`);
-            }
-            throw new Error(`HTTP error! status: ${response.status} ${await response.text()}`);
-        }
-        return await response.json();
-      }
-    };
-
-    let data = await makeRequest(contents);
-    let part = data.candidates?.[0]?.content?.parts?.[0];
-
-    // Loop to handle potential multiple sequential function calls
-    while (part?.functionCall) {
-      const call = part.functionCall;
+  const makeRequestStream = async function* (currentContents: any[], retries = 3): AsyncGenerator<string, any, unknown> {
+    let response: Response;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      response = await fetch(`${baseURL.replace(/\/$/, '')}/${modelName}:streamGenerateContent?alt=sse&key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: currentContents,
+          tools: tools
+        })
+      });
       
-      // Add the model's full message (including any thought_signatures) to context
-      contents.push(data.candidates[0].content);
+      if (!response.ok) {
+          if (response.status === 429 || response.status === 503) {
+            if (attempt < retries) {
+              await new Promise(resolve => setTimeout(resolve, attempt * 3000));
+              continue;
+            }
+            throw new Error(`API error (${response.status}) after multiple retries.`);
+          }
+          throw new Error(`HTTP error! status: ${response.status} ${await response.text()}`);
+      }
+      break;
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullFunctionCall: any = null;
+
+    for await (const chunk of response!.body as any) {
+      buffer += decoder.decode(chunk, { stream: true });
+      let lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const dataStr = line.trim().slice(6);
+          if (dataStr === '[DONE]') continue;
+          try {
+            const data = JSON.parse(dataStr);
+            const part = data.candidates?.[0]?.content?.parts?.[0];
+            if (part?.text) yield part.text;
+            if (part?.functionCall) fullFunctionCall = part.functionCall; // Capture function call
+          } catch (e) {}
+        }
+      }
+    }
+    return fullFunctionCall;
+  };
+
+  try {
+    let currentContents = contents;
+    while (true) {
+      let functionCallResult = yield* makeRequestStream(currentContents);
+      
+      if (!functionCallResult) {
+        break; // Text generation finished natively
+      }
+
+      const call = functionCallResult;
+      currentContents.push({ role: 'model', parts: [{ functionCall: call }] });
 
       let resultData: any = '';
 
@@ -232,7 +251,6 @@ Guidelines:
             updated_at: new Date().toISOString()
           });
         } catch (dbError: any) {
-          console.error('Database update failed:', dbError);
           resultMessage = `Failed to update ticket: ${dbError.message}`;
         }
         resultData = resultMessage;
@@ -242,30 +260,19 @@ Guidelines:
           (!priority || t.priority?.toLowerCase() === priority.toLowerCase()) &&
           (!status || t.status?.toLowerCase() === status.toLowerCase())
         );
-        resultData = filtered.length ? filtered.map(t => `- [${t.id}] ${t.title} (${t.status}, Priority: ${t.priority}, Assignee: ${t.assignee || 'Unassigned'})`).join('\n') : 'No tickets found matching criteria.';
+        resultData = filtered.length ? filtered.map(t => `- [${t.id}] ${t.title} (${t.status}, ${t.priority})`).join('\n') : 'No tickets found.';
       } else if (call.name === 'fetchUsers') {
-        resultData = users.map(u => `- ${u.name} (${u.email}, Role: ${u.role})`).join('\n');
+        resultData = users.map(u => `- ${u.name} (${u.role})`).join('\n');
       }
 
-      // Add the function response to context
-      contents.push({
+      currentContents.push({
         role: 'user',
-        parts: [{
-          functionResponse: {
-            name: call.name,
-            response: { name: call.name, content: resultData }
-          }
-        }]
+        parts: [{ functionResponse: { name: call.name, response: { name: call.name, content: resultData } } }]
       });
-
-      // Request final text answer from the model (or another function call)
-      data = await makeRequest(contents);
-      part = data.candidates?.[0]?.content?.parts?.[0];
+      // The while loop will now recurse and trigger makeRequestStream again with the new context!
     }
-
-    return part?.text || 'No response from assistant.';
   } catch (error: any) {
-    console.error('Error calling LLM for Copilot chat:', error);
-    throw new Error(`LLM Chat call failed: ${error.message || error}`);
+    console.error('Error in chat loop:', error);
+    yield `\n\n**Error:** ${error.message || error}`;
   }
 }

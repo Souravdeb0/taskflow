@@ -58,21 +58,40 @@ export const AICopilot: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Send message to backend with history (limit to last 15 messages to save tokens)
-      const recentMessages = messages.slice(-15);
-      const chatHistory = recentMessages.map(m => ({ role: m.role, content: m.content }));
-      const response = await api.ai.chat(textToSend, chatHistory);
+      // Append an empty assistant message to act as a placeholder for the stream
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+      // We only send previous history, NOT including the empty assistant message
+      const historyToSend = messages.slice(-15);
       
-      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
-    } catch (err: any) {
-      console.error('AICopilot Error:', err);
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `⚠️ Sorry, I encountered an error: ${err.message || 'Failed to connect to AI server.'}`,
-        },
-      ]);
+      await api.ai.chat(
+        textToSend, 
+        historyToSend,
+        (chunk) => {
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const lastIndex = newMessages.length - 1;
+            if (lastIndex >= 0 && newMessages[lastIndex].role === 'assistant') {
+              newMessages[lastIndex] = {
+                ...newMessages[lastIndex],
+                content: newMessages[lastIndex].content + chunk
+              };
+            }
+            return newMessages;
+          });
+        }
+      );
+    } catch (error: any) {
+      setMessages(prev => {
+        const newMessages = [...prev];
+        const lastIndex = newMessages.length - 1;
+        if (lastIndex >= 0 && newMessages[lastIndex].role === 'assistant' && !newMessages[lastIndex].content) {
+           newMessages[lastIndex] = { role: 'assistant', content: `⚠️ Sorry, I encountered an error: ${error.message || 'Failed to connect to AI server.'}` };
+        } else {
+           newMessages.push({ role: 'assistant', content: `⚠️ Sorry, I encountered an error: ${error.message || 'Failed to connect to AI server.'}` });
+        }
+        return newMessages;
+      });
     } finally {
       setIsLoading(false);
     }

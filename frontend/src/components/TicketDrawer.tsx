@@ -118,10 +118,14 @@ export const TicketDrawer: React.FC<TicketDrawerProps> = ({
     }
 
     setLoadingSummary(true);
+    setSummary('');
+    let streamedText = '';
     try {
-      const summaryText = await api.ai.summarize(ticket.id);
-      setSummary(summaryText);
-      sessionStorage.setItem(cacheKey, summaryText);
+      await api.ai.summarize(ticket.id, (chunk) => {
+        streamedText += chunk;
+        setSummary(streamedText);
+      });
+      sessionStorage.setItem(cacheKey, streamedText);
     } catch (err: any) {
       console.error('Failed to generate summary:', err);
       alert(err.message || 'Failed to generate summary');

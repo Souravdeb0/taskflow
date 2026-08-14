@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
-import { generateTicketSummary, chatWithCopilot } from '../services/aiService.js';
+import { generateTicketSummaryStream, chatWithCopilotStream } from '../services/aiService.js';
 import { safeSelect, safeQuery } from '../config/db.js';
 import { StringRecordId } from 'surrealdb';
 
@@ -21,8 +21,16 @@ router.post('/summarize', authMiddleware as any, async (req: AuthenticatedReques
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    const summary = await generateTicketSummary(ticket);
-    res.json({ summary });
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const stream = generateTicketSummaryStream(ticket);
+    for await (const chunk of stream) {
+      res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+    }
+    res.write(`data: [DONE]\n\n`);
+    res.end();
   } catch (err: any) {
     console.error('Error in summarize handler:', err);
     res.status(500).json({ error: err.message || 'Failed to generate summary' });
@@ -50,8 +58,16 @@ router.post('/chat', authMiddleware as any, async (req: AuthenticatedRequest, re
       role: req.user?.role || 'Employee'
     };
 
-    const reply = await chatWithCopilot(message, chatHistory, tickets, users, currentUser);
-    res.json({ reply });
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const stream = chatWithCopilotStream(message, chatHistory, tickets, users, currentUser);
+    for await (const chunk of stream) {
+      res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+    }
+    res.write(`data: [DONE]\n\n`);
+    res.end();
   } catch (err: any) {
     console.error('Error in copilot chat handler:', err);
     res.status(500).json({ error: err.message || 'Failed to get chat response' });
