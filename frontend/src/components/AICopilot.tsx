@@ -115,7 +115,7 @@ export const AICopilot: React.FC = () => {
       {/* Floating Action Button (FAB) */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 p-4 bg-gradient-to-tr from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-full shadow-lg hover:shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all z-50 flex items-center justify-center border border-indigo-400/20"
+        className="fixed bottom-24 right-6 p-4 bg-gradient-to-tr from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-full shadow-lg hover:shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all z-50 flex items-center justify-center border border-indigo-400/20"
         title="Open AI Copilot"
       >
         <Sparkles className="w-6 h-6 animate-pulse" />
