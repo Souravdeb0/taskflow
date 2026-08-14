@@ -121,9 +121,9 @@ export async function getChatMessagesHandler(req: AuthenticatedRequest, res: Res
     }
 
     // Verify access
-    const creatorIdStr = typeof chat.created_by === 'string' ? chat.created_by : chat.created_by.id;
+    const creatorIdStr = chat.created_by?.toString() || '';
     const isMember = (chat.members || []).some((m: any) => {
-      const mId = typeof m === 'string' ? m : m.id;
+      const mId = m?.toString() || '';
       return mId === userId;
     });
 
@@ -165,9 +165,9 @@ export async function sendMessageHandler(req: AuthenticatedRequest, res: Respons
     }
 
     // Verify access
-    const creatorIdStr = typeof chat.created_by === 'string' ? chat.created_by : chat.created_by.id;
+    const creatorIdStr = chat.created_by?.toString() || '';
     const isMember = (chat.members || []).some((m: any) => {
-      const mId = typeof m === 'string' ? m : m.id;
+      const mId = m?.toString() || '';
       return mId === userId;
     });
 
