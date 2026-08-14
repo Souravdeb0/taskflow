@@ -13,8 +13,18 @@ export const AICopilot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = sessionStorage.getItem('taskflow_copilot_chat');
-    if (saved) return JSON.parse(saved);
+    const saved = localStorage.getItem('taskflow_copilot_chat');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Check if the saved chat is less than 30 minutes old
+        if (parsed.timestamp && Date.now() - parsed.timestamp < 30 * 60 * 1000) {
+          return parsed.data;
+        }
+      } catch (e) {
+        console.error('Failed to parse chat history', e);
+      }
+    }
     return [{
       role: 'assistant',
       content: "Hello! I am your TaskFlow Copilot. Ask me anything about tickets, task statuses, or team workloads in your workspace!",
@@ -35,9 +45,12 @@ export const AICopilot: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // Save to session storage whenever messages change
+  // Save to storage whenever messages change, with a 30-minute timestamp
   useEffect(() => {
-    sessionStorage.setItem('taskflow_copilot_chat', JSON.stringify(messages));
+    localStorage.setItem('taskflow_copilot_chat', JSON.stringify({
+      data: messages,
+      timestamp: Date.now()
+    }));
   }, [messages]);
 
   const [lastMessageTime, setLastMessageTime] = useState(0);
