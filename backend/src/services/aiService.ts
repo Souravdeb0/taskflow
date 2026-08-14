@@ -7,7 +7,7 @@ function getAIConfig() {
   return {
     apiKey: process.env.AI_API_KEY,
     baseURL: process.env.AI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/',
-    modelName: process.env.AI_MODEL_NAME || 'gemini-1.5-flash'
+    modelName: process.env.AI_MODEL_NAME || 'gemini-3.5-flash'
   };
 }
 
