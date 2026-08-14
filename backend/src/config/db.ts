@@ -40,8 +40,24 @@ async function executeWithAuthRetry<T>(fn: () => Promise<T>): Promise<T> {
       err.message?.includes('NotAllowed') ||
       err.message?.includes('permission');
 
-    if (isAuthError) {
-      console.warn('SurrealDB session unauthenticated. Re-authenticating...');
+    const isConnectionError =
+      err.message?.toLowerCase().includes('clos') ||
+      err.message?.toLowerCase().includes('connect') ||
+      err.message?.toLowerCase().includes('socket') ||
+      err.message?.toLowerCase().includes('network') ||
+      err.message?.toLowerCase().includes('timeout');
+
+    if (isAuthError || isConnectionError) {
+      console.warn('SurrealDB error detected. Reconnecting/Re-authenticating...', err.message);
+      try {
+        if (isConnectionError) {
+          isConnected = false;
+          await db.connect(url);
+          isConnected = true;
+        }
+      } catch (e) {
+        console.error('Failed to reconnect:', e);
+      }
       await db.signin({ username: user, password: pass });
       await db.use({ namespace: ns, database: dbName });
       return await fn();

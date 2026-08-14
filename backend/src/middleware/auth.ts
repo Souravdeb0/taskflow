@@ -149,6 +149,7 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
     next();
   } catch (error) {
     console.error('Error in auth middleware:', error);
-    res.status(500).json({ error: 'Internal Server Error during authentication' });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: `Internal Server Error during authentication: ${errorMessage}` });
   }
 }
