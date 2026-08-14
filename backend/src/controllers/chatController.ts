@@ -49,10 +49,10 @@ export async function getChatsHandler(req: AuthenticatedRequest, res: Response) 
     let queryStr = '';
     const bindings: any = {};
 
-    if (userRole === 'Admin') {
+    if (userRole === 'Admin' || userRole === 'SuperAdmin') {
       queryStr = 'SELECT * FROM chat ORDER BY created_at DESC FETCH members, created_by';
     } else {
-      queryStr = 'SELECT * FROM chat WHERE created_by = $userId OR $userId IN members ORDER BY created_at DESC FETCH members, created_by';
+      queryStr = 'SELECT * FROM chat WHERE created_by = $userId OR members CONTAINS $userId ORDER BY created_at DESC FETCH members, created_by';
       bindings.userId = new StringRecordId(userId);
     }
 
@@ -127,7 +127,7 @@ export async function getChatMessagesHandler(req: AuthenticatedRequest, res: Res
       return mId === userId;
     });
 
-    if (userRole !== 'Admin' && creatorIdStr !== userId && !isMember) {
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin' && creatorIdStr !== userId && !isMember) {
       return res.status(403).json({ error: 'Forbidden: You are not a member of this chat room' });
     }
 
@@ -171,7 +171,7 @@ export async function sendMessageHandler(req: AuthenticatedRequest, res: Respons
       return mId === userId;
     });
 
-    if (userRole !== 'Admin' && creatorIdStr !== userId && !isMember) {
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin' && creatorIdStr !== userId && !isMember) {
       return res.status(403).json({ error: 'Forbidden: You cannot send messages to this chat room' });
     }
 
